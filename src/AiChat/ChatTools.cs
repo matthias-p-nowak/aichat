@@ -30,9 +30,11 @@ internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpSer
     /// <returns>New posts as [poster, message] pairs; may be empty on timeout.</returns>
     [Description("Wait for new chat posts, blocking up to the given timeout. Returns all new [poster, message] pairs; may be empty on timeout.")]
     [McpServerTool(Name = "listen", Title = "Listen", ReadOnly = true, Idempotent = false, OpenWorld = false, Destructive = false)]
-    public IReadOnlyList<string[]> Listen([Description("Maximum time to wait for new messages, in milliseconds.")] int timeoutMilliseconds)
+    public async Task<IReadOnlyList<string[]>> Listen(
+        [Description("Maximum time to wait for new messages, in milliseconds.")] int timeoutMilliseconds,
+        CancellationToken cancellationToken)
     {
         var poster = server.ClientInfo?.Name ?? httpContextAccessor.HttpContext?.Request.Headers["Mcp-Session-Id"].FirstOrDefault() ?? "unknown";
-        return state.Listen(poster, timeoutMilliseconds);
+        return await state.ListenAsync(poster, timeoutMilliseconds, cancellationToken);
     }
 }

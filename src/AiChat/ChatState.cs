@@ -33,12 +33,13 @@ internal sealed class ChatState
     }
 
     /// <summary>
-    /// Waits for new posts since the caller's last interaction, blocking up to the given timeout.
+    /// Waits asynchronously for new posts since the caller's last interaction, up to the given timeout.
     /// </summary>
     /// <param name="poster">Poster name used to track the read position.</param>
     /// <param name="timeoutMilliseconds">Maximum time to wait for new messages.</param>
+    /// <param name="cancellationToken">Token to cancel the wait early.</param>
     /// <returns>New posts as [poster, message] pairs; empty list on timeout.</returns>
-    public IReadOnlyList<string[]> Listen(string poster, int timeoutMilliseconds)
+    public async Task<IReadOnlyList<string[]>> ListenAsync(string poster, int timeoutMilliseconds, CancellationToken cancellationToken)
     {
         PostNode startNode;
         lock (gate)
@@ -53,7 +54,7 @@ internal sealed class ChatState
             }
         }
 
-        startNode.WaitNext(timeoutMilliseconds);
+        await startNode.WaitNextAsync(timeoutMilliseconds, cancellationToken);
 
         lock (gate)
         {
@@ -99,17 +100,27 @@ internal sealed class ChatState
             set
             {
                 nextNode = value;
-                if (value is not null && !nextAvailable.IsSet)
-                {
-                    nextAvailable.Signal();
-                }
+                if (value is not null)
+                    nextAvailable.TrySetResult(true);
             }
         }
-        private readonly CountdownEvent nextAvailable = new(initialCount: 1);
+        private readonly TaskCompletionSource<bool> nextAvailable = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public bool WaitNext(int timeoutMilliseconds)
+        /// <summary>
+        /// Waits asynchronously until the next node is set or the timeout/cancellation fires.
+        /// </summary>
+        public async Task<bool> WaitNextAsync(int timeoutMilliseconds, CancellationToken cancellationToken)
         {
-            return nextAvailable.Wait(timeoutMilliseconds);
+            if (nextAvailable.Task.IsCompleted)
+                return true;
+            try
+            {
+                return await nextAvailable.Task.WaitAsync(TimeSpan.FromMilliseconds(timeoutMilliseconds), cancellationToken);
+            }
+            catch (TimeoutException)
+            {
+                return false;
+            }
         }
     }
 }
