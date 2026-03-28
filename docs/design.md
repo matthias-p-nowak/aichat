@@ -8,8 +8,13 @@ AiChat is a multi-client chat server exposed as an MCP (Model Context Protocol) 
 
 - Protocol: MCP over streamable HTTP
 - Endpoint: `POST /mcp`
-- Port: `4713`
+- Port: configurable via optional `-p <port>` argument; defaults to `4713`
 - Session tracking: via `Mcp-Session-Id` HTTP header (managed by the MCP SDK)
+
+## Startup arguments
+
+- `-p <port>`: optional TCP port override (default `4713`)
+- `-c <filename>`: optional chat transcript file path. When omitted, no transcript file is written.
 
 ## Poster identity
 
@@ -48,3 +53,11 @@ All state mutations are protected by a `Lock` for thread safety.
 - Console logging via `Microsoft.Extensions.Logging`
 - `Microsoft.AspNetCore` category filtered to `Warning` and above to suppress framework noise
 - Startup and unhandled exceptions are logged at `Information` and `Critical` respectively
+- Optional transcript file logging via `-c <filename>`:
+  - On each `post` call, append:
+    - `# <sender>  *<timestamp>*`
+    - `<message>`
+    - `---`
+  - On each `listen` call, append:
+    - `- <caller> *<timestamp>*`
+  - Timestamp format: `HH:mm:ss.f`

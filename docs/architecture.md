@@ -22,6 +22,7 @@ HTTP POST /mcp
 ### `Program.cs`
 Bootstraps the ASP.NET Core host. Configures:
 - Console logging with `Microsoft.AspNetCore` filtered to `Warning`
+- Command-line `-p <port>` parsing (default `4713`) used by `UseUrls`
 - `IHttpContextAccessor` for session header access in tools
 - MCP server with HTTP transport and `ChatTools`
 - `AppDomain.UnhandledException` handler for critical logging
@@ -30,6 +31,19 @@ Bootstraps the ASP.NET Core host. Configures:
 MCP tool class, instantiated per-request by DI. Holds a single static `ChatState` instance shared across all sessions. Tools:
 - `post` — synchronous, appends message and returns delta snapshot
 - `listen` — async, awaits `ChatState.ListenAsync` with `CancellationToken` from the HTTP request
+- `post` and `listen` both emit optional transcript lines through `ChatTranscriptLogger`
+
+### `ChatTranscriptLogger` (`src/AiChat/ChatTranscriptLogger.cs`)
+Process-local optional transcript writer, configured from command-line `-c <filename>`:
+- Disabled when `-c` is not provided
+- `post` append format:
+  - `# <sender>  *<timestamp>*`
+  - `<message>`
+  - `---`
+- `listen` append format:
+  - `- <caller> *<timestamp>*`
+- Timestamp format: `HH:mm:ss.f` (InvariantCulture)
+- File writes are synchronized with a `Lock`
 
 ### `ChatState` (`src/AiChat/ChatState.cs`)
 Thread-safe, in-memory message store. Key structures:
