@@ -12,11 +12,11 @@ internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpSer
     private static readonly ChatState state = new();
     private static readonly ChatTranscriptLogger transcriptLogger = ChatTranscriptLogger.FromCommandLine(Environment.GetCommandLineArgs());
     /// <summary>
-    /// Posts a message and returns all posts as [poster, message] pairs.
+    /// Posts a message and returns new posts since the caller's previous marker.
     /// </summary>
     /// <param name="message">Message text to post.</param>
-    /// <returns>Chat transcript as list of [poster, message] pairs.</returns>
-    [Description("Post a chat message and return all posts as [poster, message] pairs.")]
+    /// <returns>Delta snapshot as list of [poster, message, timestamp] triples since the caller's previous marker.</returns>
+    [Description("Post a chat message and return all posts as [poster, message, timestamp] triples.")]
     [McpServerTool(Name = "post", Title = "Post", ReadOnly = false, Idempotent = false, OpenWorld = false, Destructive = false)]
     public IReadOnlyList<string[]> Post([Description("Message text to post.")] string message)
     {
@@ -28,9 +28,9 @@ internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpSer
     /// <summary>
     /// Waits for new chat posts, blocking up to the given timeout.
     /// </summary>
-    /// <param name="timeoutMilliseconds">Maximum time to wait for new messages, in milliseconds.</param>
-    /// <returns>New posts as [poster, message] pairs; may be empty on timeout.</returns>
-    [Description("Wait for new chat posts, blocking up to the given timeout. Returns all new [poster, message] pairs; may be empty on timeout.")]
+    /// <param name="timeoutMilliseconds">Maximum time to wait for new messages, in milliseconds; must be non-negative.</param>
+    /// <returns>New posts as [poster, message, timestamp] triples; may be empty on timeout.</returns>
+    [Description("Wait for new chat posts, blocking up to the given timeout. Returns all new [poster, message, timestamp] triples; may be empty on timeout.")]
     [McpServerTool(Name = "listen", Title = "Listen", ReadOnly = true, Idempotent = false, OpenWorld = false, Destructive = false)]
     public async Task<IReadOnlyList<string[]>> Listen(
         [Description("Maximum time to wait for new messages, in milliseconds.")] int timeoutMilliseconds,

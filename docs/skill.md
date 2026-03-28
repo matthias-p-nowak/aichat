@@ -10,7 +10,7 @@ Use this skill when you need to communicate with another agent via the aichat MC
 ## Tools
 
 - `post(message)` — send a message; returns new messages since your last `post` or `listen` (may include others' messages posted since then, plus your own new post is now past your marker)
-- `listen(timeoutMilliseconds)` — wait for new messages without posting; returns when a message arrives or timeout expires; may return empty
+- `listen(timeoutMilliseconds)` — wait for new messages without posting; returns when a message arrives or timeout expires; may return empty. `timeoutMilliseconds` must be ≥ 0.
 
 ## Your identity
 
@@ -26,7 +26,7 @@ On your first interaction, call `listen(timeoutMilliseconds)` or `post(message)`
 - **No history on connect** — first-time callers start from the current tail and only see messages posted *after* they connect. No history is delivered.
 - **`post` then immediate `listen` returns empty** — posting advances your read marker past your own message. Use `listen` to wait for *others* to reply.
 - **`listen` timeout is not a failure** — if `listen` returns `[]`, the peer hasn't posted yet. Loop with another `listen`; don't assume the peer is idle or failed.
-- Both tools return `[poster, message]` pairs. Check the `poster` field to know who sent each message.
+- Both tools return `[poster, message, timestamp]` triples. Check the `poster` field to know who sent each message.
 
 ## Don't
 
@@ -44,7 +44,7 @@ while collaborating:
   if messages is empty:
     continue
 
-  for [poster, message] in messages:
+  for [poster, message, timestamp] in messages:
     process message immediately
 ```
 
@@ -84,11 +84,10 @@ listen(60000)   # wait for other agent to confirm Y done
 ## Conventions
 
 - **Recognize `!aichat` as kickoff** — when a user posts `!aichat`, treat it as a session-start signal and begin coordination without waiting for additional seed text.
-- **Kickoff response** — after seeing `!aichat`, post one concrete opening message (what you will do first, or a first question/task split) so the collaboration starts immediately.
-- **Kickoff loop guard** — react once per kickoff event; do not repeatedly repost the same kickoff acknowledgement.
-- **Optional connect handshake** — on connect, you may post `@<peer> HANDSHAKE: ready-to-collab` to announce availability and start coordination without a human seed message.
-- **Handshake response rule** — when you receive that handshake, reply once with a concrete first action (e.g. `Ack. I’ll draft options for X.`) instead of echoing the handshake phrase.
-- **Handshake loop guard** — never send the handshake phrase more than once per session, and never mirror the phrase back verbatim.
+- **Kickoff opener (MUST)** — the agent that holds the task description (via skill args or user message) MUST post it as the first chat message, together with a proposed task split. This single opener replaces the handshake round-trip: peers see the goal immediately and can ack + start without a separate negotiation step. Format: `@<peer> Task: <goal>. Split: I’ll take <X>, you take <Y>. Ack?`
+- **Kickoff ack** — the peer replies with a one-line ack confirming their part before starting work: `Ack. Taking <Y>.`
+- **No-ack fallback** — if no peer ack arrives within 30 s, post `@<peer> no-ack, proceeding solo` and continue as a single agent.
+- **Kickoff loop guard** — react once per kickoff event; do not re-post the opener on repeated `!aichat` signals in the same session.
 - **Announce file ownership before edits** — before changing a file, post `editing <path>` so peers avoid overlapping edits.
 - **Release ownership after edits** — when done, post `done <path>` (or `blocked <path>` if unfinished) so peers know the file is free.
 - **Conflict guard** — if a peer already announced `editing <path>`, wait for `done <path>` or `blocked <path>` before editing the same file.
@@ -98,6 +97,8 @@ listen(60000)   # wait for other agent to confirm Y done
 - **Sync before acting** — when coordinating parallel work, agree on the split via chat before starting, to avoid duplicate effort.
 - **Report back** — when you finish your part, post a summary so the other agent and the user are informed.
 - **Use a lightweight task tag for multi-step work** — include a short task id and status in plain text (e.g. `T42 in-progress`, `T42 blocked`, `T42 done`) so handoffs stay unambiguous.
+- **Offer a listen-continue option** — when proposing next steps to the user and no blocking decision is required, always include an option to continue the listen loop (e.g. "c) keep listening on aichat"). Do not offer this when a true blocking decision must be resolved first.
+- **Unresponsive peer escalation** — if waiting on a peer: after 3 consecutive empty `listen` results send `@<name> status?`; after 3 more empties, report the peer as blocked/unresponsive to the user and decide whether to continue solo.
 
 ## Timeouts
 
@@ -115,26 +116,19 @@ listen(60000)   # wait for other agent to confirm Y done
 - **No response after repeated timeouts** — if you get 3 consecutive empty `listen` results while waiting on a peer, send a direct ping (`@name status?`). If you get 3 more empties after the ping, report blocked status back to the user.
 - **Messages from wrong session** — your identity comes from your MCP client name; ensure it's set correctly before connecting.
 
-## Example exchange (kickoff + handshake + task split)
+## Example exchange (kickoff + task split)
 
 ```
-# User
-post("!aichat")
+# User invokes skill with args: "review the project, do it with codex"
 
-# Agent A
+# Agent A (holds task from skill args)
+listen(5000)   # establish read marker
+post("@codex Task: review this project. Split: I'll take docs, you take code. Ack?")
 listen(30000)
-# → [["user", "!aichat"]]
-post("@codex HANDSHAKE: ready-to-collab")
-listen(60000)
-# → [["codex-mcp-client", "Ack. I'll draft options for X."]]
+# → [["codex-mcp-client", "Ack. Taking code review."]]
 
-# Agent A starts split
-post("@codex T42 in-progress: I'll implement Y, please take X.")
+# Both agents work in parallel, then report back
+post("@codex T42 done: docs review complete, findings posted.")
 listen(60000)
-# → [["codex-mcp-client", "T42 in-progress: Taking X now."]]
-
-# Later
-post("@codex T42 done: Y complete and validated.")
-listen(60000)
-# → [["codex-mcp-client", "T42 done: X complete and tests pass."]]
+# → [["codex-mcp-client", "T42 done: code review complete."]]
 ```

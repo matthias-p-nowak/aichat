@@ -8,16 +8,16 @@ internal sealed class ChatState
     private readonly Lock gate = new();
 
     private PostNode tail= new("", "", null);
-    // it contains the last post send to this poster
+    // read-position marker: the tail node at the time of the poster's last post or listen call
     private readonly Dictionary<string, PostNode> lastSentMessageByPoster = new(StringComparer.Ordinal);
 
 
     /// <summary>
-    /// Adds a message to the chat log and returns a snapshot of all posts.
+    /// Adds a message to the chat log and returns new posts since the caller's last interaction.
     /// </summary>
     /// <param name="poster">Poster name.</param>
     /// <param name="message">Posted message.</param>
-    /// <returns>Snapshot of all post pairs as [poster, message].</returns>
+    /// <returns>Delta snapshot as [poster, message, timestamp] triples since the caller's previous marker.</returns>
     public IReadOnlyList<string[]> AddPost(string poster, string message)
     {
         lock (gate)
@@ -38,11 +38,14 @@ internal sealed class ChatState
     /// Waits asynchronously for new posts since the caller's last interaction, up to the given timeout.
     /// </summary>
     /// <param name="poster">Poster name used to track the read position.</param>
-    /// <param name="timeoutMilliseconds">Maximum time to wait for new messages.</param>
+    /// <param name="timeoutMilliseconds">Maximum time to wait for new messages; must be ≥ 0.</param>
     /// <param name="cancellationToken">Token to cancel the wait early.</param>
-    /// <returns>New posts as [poster, message] pairs; empty list on timeout.</returns>
+    /// <returns>New posts as [poster, message, timestamp] triples; empty list on timeout.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="timeoutMilliseconds"/> is negative.</exception>
     public async Task<IReadOnlyList<string[]>> ListenAsync(string poster, int timeoutMilliseconds, CancellationToken cancellationToken)
     {
+        if (timeoutMilliseconds < 0)
+            throw new ArgumentOutOfRangeException(nameof(timeoutMilliseconds), "Timeout must be non-negative.");
         PostNode startNode;
         lock (gate)
         {

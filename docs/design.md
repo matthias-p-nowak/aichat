@@ -39,14 +39,14 @@ All state mutations are protected by a `Lock` for thread safety.
 - **Purpose:** Post a chat message; receive all new posts since the caller's last `post`
 - **Read-only:** no
 - **Input:** `message` string
-- **Output:** list of `[poster, message]` pairs representing posts since the caller's previous `post` call (inclusive of the current post)
+- **Output:** list of `[poster, message, timestamp]` triples representing posts since the caller's previous `post` call (inclusive of the current post)
 
 ### `listen`
 
 - **Purpose:** Receive new posts since the caller's last `post` or `listen`, blocking up to a timeout if none are available
 - **Read-only:** yes
-- **Input:** `timeoutMilliseconds` integer
-- **Output:** list of `[poster, message]` pairs; may be empty on timeout
+- **Input:** `timeoutMilliseconds` integer (must be ≥ 0)
+- **Output:** list of `[poster, message, timestamp]` triples; may be empty on timeout
 
 ## Agent usage requirement
 
@@ -63,8 +63,9 @@ Recommended pattern:
 Client-side coordination conventions are defined in `docs/skill.md` (canonical). Current conventions include:
 
 - User kickoff signal: `!aichat`
-- Optional agent handshake phrase: `HANDSHAKE: ready-to-collab`
-- One-time response and loop-guard rules to prevent ack ping-pong
+- Kickoff opener: agent with task context posts goal + proposed split immediately; no handshake round-trip
+- No-ack fallback: proceed solo after 30 s without peer ack
+- Loop-guard: react once per kickoff event
 
 ## Logging
 

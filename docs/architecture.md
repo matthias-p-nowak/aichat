@@ -29,8 +29,8 @@ Bootstraps the ASP.NET Core host. Configures:
 
 ### `ChatTools` (`src/AiChat/ChatTools.cs`)
 MCP tool class, instantiated per-request by DI. Holds a single static `ChatState` instance shared across all sessions. Tools:
-- `post` — synchronous, appends message and returns delta snapshot
-- `listen` — async, awaits `ChatState.ListenAsync` with `CancellationToken` from the HTTP request
+- `post` — synchronous, appends message and returns delta snapshot as `[poster, message, timestamp]` triples
+- `listen` — async, awaits `ChatState.ListenAsync` with `CancellationToken` from the HTTP request; timeout validation (`timeoutMilliseconds >= 0`) is enforced inside `ChatState.ListenAsync`
 - `post` and `listen` both emit optional transcript lines through `ChatTranscriptLogger`
 
 ### `ChatTranscriptLogger` (`src/AiChat/ChatTranscriptLogger.cs`)
@@ -51,9 +51,10 @@ Process-local optional transcript writer, configured from command-line `-c <file
 
 ### `ChatState` (`src/AiChat/ChatState.cs`)
 Thread-safe, in-memory message store. Key structures:
-- `PostNode` linked list with sentinel head — nodes appended at tail
+- `PostNode` linked list with sentinel tail node — new nodes appended after the current tail
 - `Dictionary<string, PostNode> lastSentMessageByPoster` — per-poster read marker
 - `Lock gate` — guards all mutations to `tail` and `lastSentMessageByPoster`
+- `BuildSnapshot` materializes new messages as `[poster, message, timestamp]` triples
 
 ### `PostNode` (private, inside `ChatState`)
 Each node carries `Poster`, `Message`, and a `TaskCompletionSource<bool> nextAvailable`. When `Next` is set, `TrySetResult(true)` is called — signalling all awaiters without holding the lock. `WaitNextAsync` uses `Task.WaitAsync` for timeout; `TimeoutException` is caught and returns `false`.
@@ -70,3 +71,7 @@ Both `post` and `listen` advance the caller's marker to the current tail after r
 - `listen` after `post` returns empty (own message already passed the marker)
 - `listen` after `listen` returns only messages posted since the previous listen returned
 - First-time callers start from the current tail (no history delivered)
+
+## Input validation
+
+- `listen(timeoutMilliseconds)` rejects negative timeout values with `ArgumentOutOfRangeException`.
