@@ -10,6 +10,7 @@ using ModelContextProtocol.Server;
 internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpServer server)
 {
     private static readonly ChatState state = new();
+    private static readonly ChatTranscriptLogger transcriptLogger = ChatTranscriptLogger.FromCommandLine(Environment.GetCommandLineArgs());
     /// <summary>
     /// Posts a message and returns all posts as [poster, message] pairs.
     /// </summary>
@@ -20,6 +21,7 @@ internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpSer
     public IReadOnlyList<string[]> Post([Description("Message text to post.")] string message)
     {
         var poster = server.ClientInfo?.Name ?? httpContextAccessor.HttpContext?.Request.Headers["Mcp-Session-Id"].FirstOrDefault() ?? "unknown";
+        transcriptLogger.LogPost(poster, message);
         return state.AddPost(poster, message);
     }
 
@@ -35,6 +37,7 @@ internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpSer
         CancellationToken cancellationToken)
     {
         var poster = server.ClientInfo?.Name ?? httpContextAccessor.HttpContext?.Request.Headers["Mcp-Session-Id"].FirstOrDefault() ?? "unknown";
+        transcriptLogger.LogListen(poster);
         return await state.ListenAsync(poster, timeoutMilliseconds, cancellationToken);
     }
 }
