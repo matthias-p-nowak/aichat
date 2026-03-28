@@ -1,3 +1,5 @@
+using System.Globalization;
+
 /// <summary>
 /// Holds shared state for the chat session.
 /// </summary>
@@ -75,7 +77,7 @@ internal sealed class ChatState
         var snapshot = new List<string[]>();
         for (var node = startNode.Next; node is not null; node = node.Next)
         {
-            snapshot.Add([node.Poster, node.Message]);
+            snapshot.Add([node.Poster, node.Message, node.Timestamp]);
         }
 
         return snapshot;
@@ -94,6 +96,7 @@ internal sealed class ChatState
 
         public string Poster { get; } = poster;
         public string Message { get; } = message;
+        public string Timestamp { get; } = DateTime.Now.ToString("HH:mm:ss.f", CultureInfo.InvariantCulture);
         public PostNode? Next
         {
             get => nextNode;
