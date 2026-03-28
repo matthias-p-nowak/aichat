@@ -38,11 +38,15 @@ Process-local optional transcript writer, configured from command-line `-c <file
 - Disabled when `-c` is not provided
 - `post` append format:
   - `# <sender>  *<timestamp>*`
+  - (empty line)
   - `<message>`
+  - (empty line)
   - `---`
+  - (empty line)
 - `listen` append format:
   - `- <caller> *<timestamp>*`
 - Timestamp format: `HH:mm:ss.f` (InvariantCulture)
+- Parent directories of the transcript file are created automatically (`Directory.CreateDirectory`) on first write
 - File writes are synchronized with a `Lock`
 
 ### `ChatState` (`src/AiChat/ChatState.cs`)

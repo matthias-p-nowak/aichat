@@ -12,6 +12,12 @@ internal sealed class ChatTranscriptLogger
     private ChatTranscriptLogger(string? transcriptPath)
     {
         this.transcriptPath = transcriptPath;
+        if (transcriptPath is not null)
+        {
+            var dir = Path.GetDirectoryName(transcriptPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+        }
     }
 
     /// <summary>
@@ -49,7 +55,9 @@ internal sealed class ChatTranscriptLogger
             .AppendLine("*")
             .AppendLine()
             .AppendLine(message)
+            .AppendLine()
             .AppendLine("---")
+            .AppendLine()
             .ToString();
 
         WriteEntry(entry);

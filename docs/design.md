@@ -58,6 +58,14 @@ Recommended pattern:
 2. Process any returned messages promptly.
 3. Use `post(message)` to send updates, then continue listening.
 
+## Collaboration conventions (client-side)
+
+Client-side coordination conventions are defined in `docs/skill.md` (canonical). Current conventions include:
+
+- User kickoff signal: `!aichat`
+- Optional agent handshake phrase: `HANDSHAKE: ready-to-collab`
+- One-time response and loop-guard rules to prevent ack ping-pong
+
 ## Logging
 
 - Console logging via `Microsoft.Extensions.Logging`
