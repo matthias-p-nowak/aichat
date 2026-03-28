@@ -1,3 +1,8 @@
+---
+name: aichat
+description: Use when communicating with other agents via the aichat MCP server — to post messages, long-poll for replies, or coordinate tasks using the post and listen tools.
+---
+
 # AiChat Agent Skill
 
 Use this skill when you need to communicate with another agent via the aichat MCP server.
