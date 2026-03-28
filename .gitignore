@@ -2,3 +2,4 @@ wt/
 bin/
 obj/
 publish/
+tmp/
