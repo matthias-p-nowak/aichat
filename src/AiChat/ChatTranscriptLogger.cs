@@ -47,6 +47,7 @@ internal sealed class ChatTranscriptLogger
             .Append("  *")
             .Append(timestamp)
             .AppendLine("*")
+            .AppendLine()
             .AppendLine(message)
             .AppendLine("---")
             .ToString();

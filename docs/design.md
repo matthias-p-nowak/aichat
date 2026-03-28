@@ -66,6 +66,7 @@ Recommended pattern:
 - Optional transcript file logging via `-c <filename>`:
   - On each `post` call, append:
     - `# <sender>  *<timestamp>*`
+    - *(empty line)*
     - `<message>`
     - `---`
   - On each `listen` call, append:
