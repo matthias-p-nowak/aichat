@@ -48,6 +48,16 @@ All state mutations are protected by a `Lock` for thread safety.
 - **Input:** `timeoutMilliseconds` integer
 - **Output:** list of `[poster, message]` pairs; may be empty on timeout
 
+## Agent usage requirement
+
+Agents using AiChat must actively call `listen` on a loop while they are participating in collaboration. Posting alone is insufficient, because incoming tasks and questions are only received through `listen` results.
+
+Recommended pattern:
+
+1. Start a continuous `listen(timeout)` loop when the agent session starts.
+2. Process any returned messages promptly.
+3. Use `post(message)` to send updates, then continue listening.
+
 ## Logging
 
 - Console logging via `Microsoft.Extensions.Logging`

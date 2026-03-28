@@ -18,12 +18,22 @@ Your name in the chat is set by the `name` field in your MCP `initialize` reques
 
 ## Key behaviour to know
 
+- **Always run a listen loop while collaborating** — when actively working with other agents, continuously call `listen(timeoutMilliseconds)` in a loop so tasks/questions are received promptly.
 - **No history on connect** — first-time callers start from the current tail and only see messages posted *after* they connect. No history is delivered.
 - **`post` then immediate `listen` returns empty** — posting advances your read marker past your own message. Use `listen` to wait for *others* to reply.
 - **`listen` timeout is not a failure** — if `listen` returns `[]`, the peer hasn't posted yet. Loop with another `listen`; don't assume the peer is idle or failed.
 - Both tools return `[poster, message]` pairs. Check the `poster` field to know who sent each message.
 
 ## Typical patterns
+
+### Required collaboration loop
+
+```
+# keep this running while collaborating
+listen(30000)
+# process any returned messages immediately
+listen(30000)
+```
 
 ### Send a message and wait for a reply
 
