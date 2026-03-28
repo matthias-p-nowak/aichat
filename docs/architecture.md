@@ -1,0 +1,54 @@
+# AiChat — Architecture
+
+## Runtime
+
+- Framework: ASP.NET Core on .NET 9
+- Entry point: `src/AiChat/Program.cs` (top-level statements)
+- MCP SDK: `ModelContextProtocol` + `ModelContextProtocol.AspNetCore` v1.2.0
+
+## Request pipeline
+
+```
+HTTP POST /mcp
+  → Kestrel (port 4713)
+  → ASP.NET Core middleware
+  → MCP streamable HTTP transport (MapMcp)
+  → MCP SDK dispatcher
+  → ChatTools (McpServerToolType)
+```
+
+## Key components
+
+### `Program.cs`
+Bootstraps the ASP.NET Core host. Configures:
+- Console logging with `Microsoft.AspNetCore` filtered to `Warning`
+- `IHttpContextAccessor` for session header access in tools
+- MCP server with HTTP transport and `ChatTools`
+- `AppDomain.UnhandledException` handler for critical logging
+
+### `ChatTools` (`src/AiChat/ChatTools.cs`)
+MCP tool class, instantiated per-request by DI. Holds a single static `ChatState` instance shared across all sessions. Tools:
+- `post` — synchronous, appends message and returns delta snapshot
+- `listen` — async, awaits `ChatState.ListenAsync` with `CancellationToken` from the HTTP request
+
+### `ChatState` (`src/AiChat/ChatState.cs`)
+Thread-safe, in-memory message store. Key structures:
+- `PostNode` linked list with sentinel head — nodes appended at tail
+- `Dictionary<string, PostNode> lastSentMessageByPoster` — per-poster read marker
+- `Lock gate` — guards all mutations to `tail` and `lastSentMessageByPoster`
+
+### `PostNode` (private, inside `ChatState`)
+Each node carries `Poster`, `Message`, and a `TaskCompletionSource<bool> nextAvailable`. When `Next` is set, `TrySetResult(true)` is called — signalling all awaiters without holding the lock. `WaitNextAsync` uses `Task.WaitAsync` for timeout; `TimeoutException` is caught and returns `false`.
+
+## Concurrency model
+
+- `post` holds the lock for the full append + snapshot — O(n) where n = new messages
+- `listen` acquires the lock only to read the start marker and check for immediate messages, then releases before awaiting — no thread blocked during the wait
+- Multiple concurrent `listen` callers each await their own node's TCS; a single `post` unblocks all of them simultaneously via `TrySetResult`
+
+## Per-poster marker semantics
+
+Both `post` and `listen` advance the caller's marker to the current tail after returning. This means:
+- `listen` after `post` returns empty (own message already passed the marker)
+- `listen` after `listen` returns only messages posted since the previous listen returned
+- First-time callers start from the current tail (no history delivered)

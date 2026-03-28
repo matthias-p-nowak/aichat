@@ -4,6 +4,9 @@ run:
 publish:
     dotnet publish src/AiChat/AiChat.csproj -c Release -o publish --self-contained true -p:PublishSingleFile=true
 
+start:
+    ./publish/AiChat
+
 mcpjam:
     npx @mcpjam/inspector@latest 
 
