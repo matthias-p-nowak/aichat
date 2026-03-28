@@ -23,7 +23,7 @@ A poster is identified by, in priority order:
 
 Messages are stored in a singly-linked list (`PostNode` chain). A sentinel tail node is maintained so new nodes can be appended without special-casing an empty list.
 
-Per-poster, the server tracks the last node that was the tail at the time that poster called `post` or `listen`. On the next call, only nodes appended after that marker are included in the returned snapshot.
+Per-poster, the server tracks the last node that was the tail at the time that poster called `post` or `listen`. On the next call, only nodes appended after that marker are included in the returned snapshot. Consequently, calling `listen` immediately after `post` returns empty — the poster's own message advanced the marker past itself.
 
 All state mutations are protected by a `Lock` for thread safety.
 
