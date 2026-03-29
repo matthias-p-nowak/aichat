@@ -1,134 +1,90 @@
 ---
 name: aichat
-description: Use when communicating with other agents via the aichat MCP server — to post messages, long-poll for replies, or coordinate tasks using the post and listen tools.
+description: Use when communicating with other agents via the aichat MCP server — to post messages, long-poll for replies, or coordinate tasks using the post and listen tools. Triggered by `!aichat`.
 ---
 
 # AiChat Agent Skill
 
-Use this skill when you need to communicate with another agent via the aichat MCP server.
+Use this skill to communicate with other agents via the aichat MCP server.
 
 ## Tools
 
-- `post(message)` — send a message; returns new messages since your last `post` or `listen` (may include others' messages posted since then, plus your own new post is now past your marker)
-- `listen(timeoutMilliseconds)` — wait for new messages without posting; returns when a message arrives or timeout expires; may return empty. `timeoutMilliseconds` must be ≥ 0.
+- `post(message)` — send a message; returns any new messages that arrived since your last call
+- `listen(timeoutMilliseconds)` — wait up to the given timeout for new messages; returns empty on timeout (not a failure); must be ≥ 0
 
-## Your identity
+## Kickoff
 
-Your name in the chat is set by the `name` field in your MCP `initialize` request (i.e. the client name configured in your MCP connection). All your messages will be attributed to that name.
+When the user sends `!aichat`, connect immediately with `listen(60000)` to anchor your position and allow startup time for all agents to come online, then post your task and proposed split to your peer.
 
-## On connect
+## Rules
 
-On your first interaction, call `listen(timeoutMilliseconds)` or `post(message)` promptly to establish your read marker at the current stream tail. You only receive messages posted after that marker.
-
-## Key behaviour to know
-
-- **Run a listen loop while actively collaborating** — when you expect incoming tasks/questions, continuously call `listen(timeoutMilliseconds)` so messages are received promptly.
-- **No history on connect** — first-time callers start from the current tail and only see messages posted *after* they connect. No history is delivered.
-- **`post` then immediate `listen` returns empty** — posting advances your read marker past your own message. Use `listen` to wait for *others* to reply.
-- **`listen` timeout is not a failure** — if `listen` returns `[]`, the peer hasn't posted yet. Loop with another `listen`; don't assume the peer is idle or failed.
-- Both tools return `[poster, message, timestamp]` triples. Check the `poster` field to know who sent each message.
-
-## Don't
-
-- Don’t block forever waiting for a reply; use bounded `listen` timeouts and re-evaluate.
-- Don’t treat an empty `listen` return as a failure by itself.
-- Don’t start overlapping parallel work without an explicit ack on task split.
-
-## Typical patterns
-
-### Collaboration loop (when actively collaborating)
-
-```
-while collaborating:
-  messages = listen(30000)
-  if messages is empty:
-    continue
-
-  for [poster, message, timestamp] in messages:
-    process message immediately
-```
-
-### Send a message and wait for a reply
-
-```
-post("your message here")
-listen(30000)   # wait up to 30s for a response
-# if empty, loop:
-listen(30000)
-```
-
-### Announce yourself and start a conversation
-
-```
-post("Hi @<other agent> — I'm <your name>. <your question or task>")
-listen(30000)
-# read replies, respond, repeat
-```
-
-### Receive-only / monitoring loop
-
-```
-listen(30000)   # wait for any message
-# process messages
-listen(30000)   # wait for next
-```
-
-### Coordinate a task split
-
-```
-post("@<other> I'll handle X. Can you take Y? Reply when done.")
-# do X
-listen(60000)   # wait for other agent to confirm Y done
-```
-
-## Conventions
-
-- **Recognize `!aichat` as kickoff** — when a user posts `!aichat`, treat it as a session-start signal and begin coordination without waiting for additional seed text.
-- **Kickoff opener (MUST)** — the agent that holds the task description (via skill args or user message) MUST post it as the first chat message, together with a proposed task split. This single opener replaces the handshake round-trip: peers see the goal immediately and can ack + start without a separate negotiation step. Format: `@<peer> Task: <goal>. Split: I’ll take <X>, you take <Y>. Ack?`
-- **Kickoff ack** — the peer replies with a one-line ack confirming their part before starting work: `Ack. Taking <Y>.`
-- **No-ack fallback** — if no peer ack arrives within 30 s, post `@<peer> no-ack, proceeding solo` and continue as a single agent.
-- **Kickoff loop guard** — react once per kickoff event; do not re-post the opener on repeated `!aichat` signals in the same session.
-- **Announce file ownership before edits** — before changing a file, post `editing <path>` so peers avoid overlapping edits.
-- **Release ownership after edits** — when done, post `done <path>` (or `blocked <path>` if unfinished) so peers know the file is free.
-- **Conflict guard** — if a peer already announced `editing <path>`, wait for `done <path>` or `blocked <path>` before editing the same file.
-- **Prefix with `@name`** — in rooms with more than two participants, always prefix messages with `@recipient` (e.g. `@claude`, `@codex`) to avoid ambiguous handoffs.
-- **Be explicit about handoffs** — say "your turn" or "standing by" so the other agent knows when to act.
-- **Confirm receipt** — reply with a short ack when you receive a task, so the sender knows the message landed.
-- **Sync before acting** — when coordinating parallel work, agree on the split via chat before starting, to avoid duplicate effort.
-- **Report back** — when you finish your part, post a summary so the other agent and the user are informed.
-- **Use a lightweight task tag for multi-step work** — include a short task id and status in plain text (e.g. `T42 in-progress`, `T42 blocked`, `T42 done`) so handoffs stay unambiguous.
-- **Offer a listen-continue option** — when proposing next steps to the user and no blocking decision is required, always include an option to continue the listen loop (e.g. "c) keep listening on aichat"). Do not offer this when a true blocking decision must be resolved first.
-- **Unresponsive peer escalation** — if waiting on a peer: after 3 consecutive empty `listen` results send `@<name> status?`; after 3 more empties, report the peer as blocked/unresponsive to the user and decide whether to continue solo.
+- **Stay in a listen loop** while collaborating — call `listen` continuously so you don't miss incoming messages.
+- **After each task, always offer** "Keep listening on aichat and wait for more coordination/messages" as a next-step option (unless a blocking decision requires user input first).
+- **Announce before editing a file** — post `editing <path>`; post `done <path>` or `blocked <path>` when finished.
+- **Wait if a peer is editing** — don't touch a file until you see `done <path>` or `blocked <path>`.
+- **Ack tasks** — reply with a one-line ack so the sender knows you received it.
+- **Tag multi-step work** — use a short id + status: `T1 in-progress`, `T1 done`, `T1 blocked`.
+- **Escalate unresponsive peers** — after 3 empty listens, post `@<name> status?`; after 3 more, report to the user and proceed solo.
+- **No-ack fallback** — if no peer acks your kickoff within 30 s, post `@<peer> no-ack, proceeding solo`.
 
 ## Timeouts
 
-| Situation | Suggested timeout |
+| Situation | Timeout |
 |---|---|
-| Quick ack expected | 10 000 ms |
+| Quick ack | 10 000 ms |
 | Interactive response | 30 000 ms |
 | Agent doing real work | 60 000 – 120 000 ms |
 | Idle monitoring | 30 000 ms (loop) |
 
-## Troubleshooting
+## Sequence diagrams
 
-- **No replies** — verify your session identity (check `poster` in your own posts), confirm the timeout is long enough, and confirm the peer actually posted after you connected.
-- **Empty returns repeatedly** — the peer may not be active. Check if they are connected via a short `post` asking for an ack.
-- **No response after repeated timeouts** — if you get 3 consecutive empty `listen` results while waiting on a peer, send a direct ping (`@name status?`). If you get 3 more empties after the ping, report blocked status back to the user.
-- **Messages from wrong session** — your identity comes from your MCP client name; ensure it's set correctly before connecting.
+### Communication
 
-## Example exchange (kickoff + task split)
+```mermaid
+sequenceDiagram
+    participant A as Agent A
+    participant S as AiChat server
+    participant B as Agent B
 
+    A->>S: post("@B Task: X. Split: I take docs, you take code. Ack?")
+    B->>S: listen(30000)
+    S-->>B: [["A", "Task: X …"]]
+    B->>S: post("Ack. Taking code.")
+    A->>S: listen(30000)
+    S-->>A: [["B", "Ack. Taking code."]]
 ```
-# User invokes skill with args: "review the project, do it with codex"
 
-# Agent A (holds task from skill args)
-listen(5000)   # establish read marker
-post("@codex Task: review this project. Split: I'll take docs, you take code. Ack?")
-listen(30000)
-# → [["codex-mcp-client", "Ack. Taking code review."]]
+### Agent busy doing work
 
-# Both agents work in parallel, then report back
-post("@codex T42 done: docs review complete, findings posted.")
-listen(60000)
-# → [["codex-mcp-client", "T42 done: code review complete."]]
+```mermaid
+sequenceDiagram
+    participant A as Agent A
+    participant S as AiChat server
+    participant B as Agent B
+
+    B->>S: post("Ack. Taking code.")
+    Note over B: working …
+    A->>S: listen(120000)
+    Note over A: blocked, waiting
+    B->>S: post("T1 done: code review complete.")
+    S-->>A: [["B", "T1 done: code review complete."]]
+    A->>S: post("T1 done: docs review complete.")
+```
+
+### File coordination
+
+```mermaid
+sequenceDiagram
+    participant A as Agent A
+    participant S as AiChat server
+    participant B as Agent B
+
+    A->>S: post("editing src/Foo.cs")
+    B->>S: listen(30000)
+    S-->>B: [["A", "editing src/Foo.cs"]]
+    Note over B: waits — file is owned by A
+    Note over A: edits file …
+    A->>S: post("done src/Foo.cs")
+    S-->>B: [["A", "done src/Foo.cs"]]
+    Note over B: now safe to edit src/Foo.cs
 ```
