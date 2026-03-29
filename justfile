@@ -1,5 +1,5 @@
 run:
-    dotnet run --project src/AiChat/AiChat.csproj -- -c /tmp/aichat.md
+    dotnet run --project src/AiChat/AiChat.csproj -- -c tmp/aichat.md
 
 publish:
     dotnet publish src/AiChat/AiChat.csproj -c Release -o publish --self-contained true -p:PublishSingleFile=true

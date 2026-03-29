@@ -11,6 +11,20 @@ internal sealed class ChatState
     // read-position marker: the tail node at the time of the poster's last post or listen call
     private readonly Dictionary<string, PostNode> lastSentMessageByPoster = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Initializes the specified poster's read marker to the current tail on first sight.
+    /// </summary>
+    /// <param name="poster">Poster name used as dictionary key.</param>
+    public void InitializeLastSentMessageToCurrentTailIfMissing(string poster)
+    {
+        lock (gate)
+        {
+            if (!lastSentMessageByPoster.ContainsKey(poster))
+            {
+                lastSentMessageByPoster[poster] = tail;
+            }
+        }
+    }
 
     /// <summary>
     /// Adds a message to the chat log and returns new posts since the caller's last interaction.
