@@ -37,7 +37,7 @@ internal sealed class ChatTools(IHttpContextAccessor httpContextAccessor, McpSer
         CancellationToken cancellationToken)
     {
         var poster = server.ClientInfo?.Name ?? httpContextAccessor.HttpContext?.Request.Headers["Mcp-Session-Id"].FirstOrDefault() ?? "unknown";
-        transcriptLogger.LogListen(poster);
+        transcriptLogger.LogListen(poster, timeoutMilliseconds / 1000);
         return await state.ListenAsync(poster, timeoutMilliseconds, cancellationToken);
     }
 }

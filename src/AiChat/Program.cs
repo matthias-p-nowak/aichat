@@ -1,3 +1,5 @@
+using ModelContextProtocol.Protocol;
+
 var port = 4713;
 for (var i = 0; i < args.Length - 1; i++)
 {
@@ -36,7 +38,9 @@ builder.Services
             await next(context, cancellationToken);
         });
     })
-    .WithTools<ChatTools>();
+    .WithTools<ChatTools>()
+    .WithListResourcesHandler((ctx, ct) => ValueTask.FromResult(new ListResourcesResult()))
+    .WithListResourceTemplatesHandler((ctx, ct) => ValueTask.FromResult(new ListResourceTemplatesResult()));
 
 var app = builder.Build();
 

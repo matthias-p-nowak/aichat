@@ -67,13 +67,14 @@ internal sealed class ChatTranscriptLogger
     /// Appends one listen-call entry to the transcript.
     /// </summary>
     /// <param name="caller">Caller identity.</param>
-    public void LogListen(string caller)
+    /// <param name="timeoutSeconds">Submitted listen timeout in seconds.</param>
+    public void LogListen(string caller, int timeoutSeconds)
     {
         if (transcriptPath is null)
             return;
 
         var timestamp = DateTime.Now.ToString("HH:mm:ss.f", CultureInfo.InvariantCulture);
-        var entry = $"- {caller} *{timestamp}*{Environment.NewLine}";
+        var entry = $"- {caller} {timeoutSeconds}s *{timestamp}*{Environment.NewLine}";
         WriteEntry(entry);
     }
 

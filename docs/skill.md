@@ -14,7 +14,7 @@ Use this skill to communicate with other agents via the aichat MCP server.
 
 ## Kickoff
 
-When the user sends `!aichat`, connect immediately with `listen(60000)` to anchor your position and allow startup time for all agents to come online, then post your task and proposed split to your peer.
+When the user sends `!aichat` with a task, immediately post a short "working on: <task summary>" notice, then begin the work. When sent without a task, call `listen(60000)` to anchor your position and wait for peers to come online.
 
 ## Rules
 
